@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="./fondoa/logo.png">
+    <title>Golftaro</title>
+    <style>
+        body 
+        {
+            margin: 0;
+            overflow: hidden;
+            background-image: url("./fondoa/udaberria.png");
+            background-size: 100% 100%;
+            background-position: center;
+            background-repeat: no-repeat;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+
+        canvas 
+        {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="myCanvas"></canvas>
+
+    <script>
+        //Aldagaia deklaratu:
+        const canvas = document.getElementById('myCanvas');
+        const ctx = canvas.getContext('2d');
+
+        //Canvas-a ajustatzeko exploradoreko pantailara
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        const ballRadius = 20;
+        let ballX = ballRadius;
+        let ballY = canvas.height - 2 * ballRadius;
+        let vx = 0;
+        let vy = 0;
+        const gravity = 0.5;
+        const bounceFactor = 0.65; 
+        let isDragging = false;
+        let mouseX, mouseY;
+        let canLaunch = true;
+
+        //Poligonoaren koordenadak aldagaian gorde:
+        const polygonCoords = [0,585, 195,585, 343,470, 650,470,780,570, 975,570, 1020,470,1145,470,1180,390,1375,390, 1375,415, 1430,415, 1430,390, 1550,390, 1550,800, 0,800];
+
+        //Ikusten du ea poligonoan dagoen edo ez
+        function pointInPolygon(x, y, polyCoords) 
+        {
+            let inside = false;
+
+            for (let i = 0, j = polyCoords.length - 2; i < polyCoords.length - 1; j = i, i += 2) {
+                const xi = polyCoords[i];
+                const yi = polyCoords[i + 1];
+                const xj = polyCoords[j];
+                const yj = polyCoords[j + 1];
+
+                const intersect = ((yi > y) !== (yj > y)) && (x < ((xj - xi) * (y - yi)) / (yj - yi) + xi);
+
+                if (intersect) {
+                    inside = !inside;
+                }
+            }
+
+            return inside;
+        }
+
+        //Pelota marrazten du
+        function drawBall() 
+        {
+            ctx.beginPath();
+            ctx.arc(ballX, ballY, ballRadius, 0, Math.PI * 2);
+            ctx.fillStyle = 'white';
+            ctx.fill();
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.closePath();
+        }
+
+        //Poligonoa marrazten du
+        function drawPolygon() 
+        {
+            ctx.beginPath();
+            ctx.fillStyle = 'rgba(255, 0, 0, 0'; //poligonoa transparentea jartzen du
+            ctx.moveTo(polygonCoords[0], polygonCoords[1]);
+
+            for (let i = 2; i < polygonCoords.length; i += 2) 
+            {
+                ctx.lineTo(polygonCoords[i], polygonCoords[i + 1]);
+            }
+
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        //Marra marrazten du pelotaren norabidea adierazten duena
+        function drawDirectionLine() 
+        {
+            if (isDragging) 
+            {
+                ctx.beginPath();
+                ctx.moveTo(ballX, ballY);
+                const angle = Math.atan2(mouseY - ballY, mouseX - ballX);
+                const lineLength = 50;
+                const endX = ballX + lineLength * Math.cos(angle);
+                const endY = ballY + lineLength * Math.sin(angle);
+                ctx.lineTo(endX, endY);
+                ctx.strokeStyle = 'black';
+                ctx.stroke();
+                ctx.closePath();
+            }
+        }
+
+        //Pelotaren mugimentua kalkulatu (kontuan: grabitatea, errebotea eta txokea) eta lurra ikutzen duenean berriro jaurtitzeko
+        function moveBall() 
+        {
+            vy += gravity;
+
+            ballX += vx;
+            ballY += vy;
+
+            if (ballX - ballRadius < 0 || ballX + ballRadius > canvas.width) 
+            {
+                vx = -vx * bounceFactor;
+
+                if (ballX - ballRadius < 0) 
+                {
+                    ballX = ballRadius;
+                } 
+                else 
+                {
+                    ballX = canvas.width - ballRadius;
+                }
+            }
+
+            if (ballY - ballRadius < 0 || ballY + ballRadius > canvas.height) 
+            {
+                vy = -vy * bounceFactor;
+
+                if (ballY - ballRadius < 0) 
+                {
+                    ballY = ballRadius;
+                } 
+                else 
+                {
+                    ballY = canvas.height - ballRadius;
+                }
+
+                if (ballY + ballRadius > canvas.height / 2) 
+                {
+                    canLaunch = true;
+                }
+            }
+
+            if (pointInPolygon(ballX, ballY, polygonCoords)) 
+            {
+                vy = -vy * bounceFactor;
+
+                for (let i = 1; i < polygonCoords.length; i += 2) 
+                {
+                    const polyY = polygonCoords[i];
+                    if (ballY + ballRadius > polyY) 
+                    {
+                        ballY = polyY - ballRadius;
+                        break;
+                    }
+                }
+
+                vx *= bounceFactor;
+                vy *= bounceFactor;
+            }
+
+            //Abiadura murrizteko
+            if (ballY + ballRadius >= canvas.height && Math.abs(vy) > 0 && Math.abs(vx) > 0.1) 
+            {
+                vx /= 2;
+            }
+
+            //Lurra ikutzen duenean gelditzeko eta berriro jaurti ahal izateko
+            if (ballY + ballRadius >= canvas.height && Math.abs(vy) < 0.1) 
+            {
+                vy = 0;
+                canLaunch = true; //Lurra ikutzen duenean berriro jaurti ahal izateko
+            }
+
+            //Banderara heltzean aldatzeko pantailaz, hau da, koordenada determinatu batzuk ikutzean (bandera) aldatzeko pantailaz
+            if ((ballX >= 1375 && ballX <= 1430) && (ballY >= 415 - ballRadius && ballY <= 415 + ballRadius)) 
+            {
+                window.location.href = 'menua.html';
+            }
+
+            draw();
+        }
+
+        //Ezabatu egiten du, eta berriro marrazten du pelota, poligonoa eta marraren norantza
+        function draw() 
+        {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawBall();
+            drawPolygon();
+            drawDirectionLine();
+        }
+
+        //Animazioarekin hasten da eta requestAnimationFrame erabiltzen du
+        function animate() 
+        {
+            moveBall();
+            requestAnimationFrame(animate);
+        }
+
+        //Arratoia mugitzean koordenadak eguneratu
+        function canvasInteract(event) 
+        {
+            const rect = canvas.getBoundingClientRect();
+            mouseX = event.clientX - rect.left;
+            mouseY = event.clientY - rect.top;
+
+            if (!canLaunch) {
+                draw();
+                drawDirectionLine();
+            }
+        }
+
+        //Arrastratzeko marra
+        function canvasMouseDown() 
+        {
+            if (canLaunch) 
+            {
+                isDragging = true;
+            }
+        }
+
+        //Abiadura kalkulatu eta baita pelotaren norabidea
+        function canvasMouseUp() 
+        {
+            if (isDragging) {
+                isDragging = false;
+
+                const angle = Math.atan2(mouseY - ballY, mouseX - ballX);
+                const speed = 10;
+
+                vx = speed * Math.cos(angle);
+                vy = 2 * speed * Math.sin(angle);
+
+                canLaunch = true;
+            }
+        }
+
+        //Arratoiaren mugimenduak
+        canvas.addEventListener('mousedown', canvasMouseDown);
+        canvas.addEventListener('mouseup', canvasMouseUp);
+        canvas.addEventListener('mousemove', canvasInteract);
+
+        //Exploradoreko leihora ajustatzeko
+        window.addEventListener('resize', () => 
+        {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+
+        //Animazioa denbora guztian egoteko
+        animate();
+    </script>
+</body>
+</html>

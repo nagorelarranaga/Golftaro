@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="./fondoa/logo.png">
+    <title>Golftaro</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-image: url("./fondoa/negua.png");
+            background-size: 100% 100%;
+            background-position: center;
+            background-repeat: no-repeat;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="myCanvas"></canvas>
+
+    <script>
+      
+    window.onload = function() {
+    var canvas = document.getElementById("myCanvas");
+    var ctx = canvas.getContext("2d");
+
+    setCanvasSize();
+
+    // Grabitatea simulatzeko
+    const ballRadius = 25;
+    var gravity = 0.5;
+    const damping = 0.5; // Increase the damping factor for a heavier effect
+
+    // Hasierako posizioak eta abiadurak
+    var x = 50;
+    var y = 604;
+    var velocityY = 0;
+    var velocityX = 0;
+    var initialVelocity = 10; // arratoia soltatzerakoan hasierako abiadura
+    var reboundAmount = 0;
+    var collisionArea = 0;
+
+    // Pilotarekin interaktuatzeko aldagaiak hasieratu
+    var mouseDown = false;
+    var canShootAgain = false;
+    var arrowAngle = 0;
+
+    var entorno = [];
+    const polygonCoords = [0, 602, 175, 602, 175, 525, 334, 525, 334, 630, 680, 630, 777, 430, 1075, 430, 1135, 505, 1220, 505, 1255, 368, 1354, 368, 1360, 380, 1375, 395, 1380, 395, 1395, 397, 1399, 395, 1410, 368, 1539, 368, 1539, 1080, -1, 1079];
+
+    class Cuadrado {
+        constructor(x0, y0, dimX, dimY) {
+            this.x0 = x0;
+            this.y0 = y0;
+            this.dimX = dimX;
+            this.dimY = dimY;
+            this.tipo = "Cuadrado";
+        }
+    }
+    class Rampa {
+        constructor(ceroX, ceroY, finX, finY, tipo) {
+            this.ceroX = ceroX;
+            this.ceroY = ceroY;
+            this.finX = finX;
+            this.finY = finY;
+            this.tipo = tipo;
+        }
+    }
+
+    function crearObstaculos() {
+        var cuadrado1 = new Cuadrado(0, 607, 175, 77);
+        var cuadrado2 = new Cuadrado(175,525,159,105);
+        var cuadrado3 = new Cuadrado(334,630,346,105);
+        var cuadrado4 = new Cuadrado(777,430,298,150);
+        var cuadrado5 = new Cuadrado(1131,505,89,50);
+        var cuadrado6 = new Cuadrado(1255,368,99,60);
+        var cuadrado7 = new Cuadrado(1415,368,200,50);
+        entorno[0] = cuadrado1;
+        entorno[1] = cuadrado2;
+        entorno[2] = cuadrado3;
+        entorno[3] = cuadrado4;
+        entorno[4] = cuadrado5;
+        entorno[5] = cuadrado6;
+        entorno[6] = cuadrado7;
+
+        var rampa1 = new Rampa(680,630,777,430,"Rampa");
+        entorno[7] = rampa1;
+        var rampa2 = new Rampa(1220,505,1255,368,"Rampa");
+        entorno[8] = rampa2;
+
+
+        
+        var cuadrado8 = new Cuadrado(1075,495,52,80);
+        entorno[9] = cuadrado8;
+        var cuadrado9 = new Cuadrado(1075,495,52,80);
+        entorno[10] = cuadrado9;
+        var cuadrado10 = new Cuadrado(1075,475,36,80);
+        entorno[11] = cuadrado10;
+        var cuadrado11 = new Cuadrado(1075,455,20,80);
+        entorno[12] = cuadrado11;
+        var cuadrado12 = new Cuadrado(1075,435,4,80);
+        entorno[13] = cuadrado12;
+        
+    }
+
+    // Pantaila ajustatzea
+    window.addEventListener('resize', setCanvasSize);
+
+    // Arratoiaren klika
+    window.addEventListener('mousedown', function(event) {
+        if(canShootAgain) {   // Berriro jaurtizeko pilota guztiz geldi egon behar da
+            aimArrow(event);
+            mouseDown = true;
+        }
+    });
+
+    // Arratoia soltatzerakoan
+    window.addEventListener('mouseup', function(event) {
+        if (mouseDown) {
+            // Abiadura angeluaren menpe (biderketekin ajustatu)
+            velocityY = (+initialVelocity * Math.sin(arrowAngle))*2;
+            velocityX = +initialVelocity * Math.cos(arrowAngle)*1.5;
+
+            if((collisionArea === 1 && velocityY > 0)) {    // Oztoporen bat ukitzen badu goitik, ez du jaurtitzen uzten
+                velocityY = 0;
+                velocityX = 0;
+                canShootAgain = false;
+            } else {    // Goitik ez badu oztoporik ukitu, jaurtitzen utzi
+                gravity = 0.5;
+                reboundAmount = 0;
+                canShootAgain = false;
+            }
+            mouseDown = false;
+        }
+    });
+
+    
+    window.addEventListener('mousemove', function(event) {
+        if (mouseDown) {
+            aimArrow(event);
+        }
+    });
+
+    function setCanvasSize() {
+        // Pantailaren tamainua ajustatu
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        // Pilotaren posizioa eguneratu
+        x = 50;
+        y = 50;
+        velocityY = 0;
+        velocityX = 0;
+    }
+
+    function aimArrow(event) {
+        var rect = canvas.getBoundingClientRect();
+        var mouseX = event.clientX - rect.left;
+        var mouseY = event.clientY - rect.top;
+
+        // Pilotaren eta arratoiaren posizioaren arteko angelua, norabide gidarako
+        arrowAngle = Math.atan2(mouseY - (y + ballRadius), mouseX - (x + ballRadius));
+    }
+
+    function colisionesPantalla() { // Abiadura inbertitzea erpin bat ukitzerakoan eta marruskadura jarri
+                                    // erreboteak zenbatu, infinitu aldiz ez errebotatzeko
+        if (y + ballRadius*2 > canvas.height) { 
+            y = canvas.height - ballRadius*2;
+            velocityY *= -1;
+            velocityY *= damping;
+            velocityX *= damping;
+            reboundAmount += 1;
+        }
+        if (y <=  0) {
+            y = 0;
+            velocityY *= -1;
+            velocityY *= damping;
+            velocityX *= damping;
+            reboundAmount += 1;
+        }
+        if (x + ballRadius*2 > canvas.width) {
+            x = canvas.width - ballRadius*2;
+            velocityX *= -1;
+            velocityX *= damping;
+            velocityY *= damping;
+        }
+        if (x <=  0) {
+            x = 0;
+            velocityX *= -1;
+            velocityX *= damping;
+            velocityY *= damping;
+        }
+    }
+
+    function colisionesEntorno() {
+        collisionArea = 0; // Oztopoa nondik ukitzen duen jakiteko|| Goitik: 1  ||  Ezkerretik: 2  ||  Eskuinetik: 3  ||  Aldapa: 4
+        nextX = x + velocityX;
+        nextY = y + velocityY;
+        
+        let i;
+        for(i = 0; i < entorno.length; i++) {
+            var obstaculoAMirar = entorno[i];
+            if(obstaculoAMirar.tipo === "Cuadrado") {
+                var cuadradoX = obstaculoAMirar.x0;
+                var cuadradoY = obstaculoAMirar.y0;
+                var cuadradoDimX = obstaculoAMirar.dimX;
+                var cuadradoDimY = obstaculoAMirar.dimY;
+                
+                if((x + ballRadius*2 < cuadradoX)) {
+                    if((nextX + ballRadius*2 > cuadradoX) && (nextY + ballRadius*2 > cuadradoY)) {
+                        x += -((x + ballRadius*2) - (cuadradoX));
+                        collisionArea = 2;
+                    }
+                } else if((x > cuadradoX + cuadradoDimX)) {
+                    if((nextX <= cuadradoX + cuadradoDimX) && (nextY + ballRadius*2 > cuadradoY)) {
+                        x -= ((x) - (cuadradoX + cuadradoDimX));
+                        collisionArea = 3;
+                    }
+                } else if((x + ballRadius*2 > cuadradoX) && (x < cuadradoX + cuadradoDimX)) {
+                    if((nextY + ballRadius*2 > cuadradoY)) {
+                        y += -((y + ballRadius*2) - (cuadradoY));
+                        collisionArea = 1;
+                    }
+                }
+            } else if(obstaculoAMirar.tipo === "Rampa" && collisionArea === 0) {
+                // Aldaparen hasiera eta bukaera puntuak
+                const rampStart = { x: obstaculoAMirar.ceroX, y: obstaculoAMirar.ceroY };
+                const rampEnd = { x: obstaculoAMirar.finX, y: obstaculoAMirar.finY };
+
+                if(!((x + ballRadius*2 > rampEnd.x) && (y + ballRadius*2 < rampEnd.y))) {
+                    // Aldaparen malda eta distantzia kalkulatu
+                    const slope = (rampEnd.y - rampStart.y) / (rampEnd.x - rampStart.x);
+                    
+                    const yIntercept = rampStart.y - slope * rampStart.x;
+                    
+                    const distance = Math.abs((slope * (nextX) - (nextY) + yIntercept) / Math.sqrt(slope * slope + 1));
+                
+                    // Begiratzea distantzia txikiagoa edo berdin pilotaren erradioa den ala ez, ukitzen dauden ala ez jakiteko
+                    if(distance <= ballRadius*2) {
+                        collisionArea = 4;
+                        console.log("Touching");
+                    } else {
+                        console.log("Nothing");
+                    }
+                }
+            }
+        }
+
+        switch (collisionArea) {
+            case 1:
+                console.log("Arriba")
+                velocityY *= -1;        // Izkinak ez dira kontutan hartzen errebotatzeko
+                velocityY *= damping;   // Marruskadura aplikatzeko
+                velocityX *= damping;
+                reboundAmount += 1;
+                break;
+            case 2:
+                console.log("Izquierda")
+                velocityX *= -1;
+                velocityY *= damping;
+                velocityX *= damping;
+                reboundAmount += 1;
+                break;
+            case 3:
+                console.log("Derecha")
+                velocityX *= -1;
+                velocityY *= damping;
+                velocityX *= damping;
+                reboundAmount += 1;
+                break;
+            case 4:
+                console.log("Rampa")
+                velocityX *= -1;
+                velocityY *= -1;
+                velocityY *= damping;
+                velocityX *= damping;
+                reboundAmount += 1;
+                break;
+            case 0:
+                break;
+        }
+    }
+
+    function colisionAgujero() {
+        if ((x >= 1255 && x + ballRadius*2 <= 1410) && (y >= 398 - ballRadius*2 && y <= 398 + ballRadius*2)) {
+            window.location.href = 'menua.html';
+        }
+    }
+
+    function update() {
+        // Grabitatea aplikatu
+        velocityY += gravity;
+
+        // Posizooa aldatu abiaduraren menpe
+        y += velocityY;
+        x += velocityX;
+
+        colisionesPantalla();   // Pantailaren erpinekin dituen kolisioak
+        colisionesEntorno();    // Kolisioak erliebearekin
+        colisionAgujero();      // Pilotaren amaiera puntua/orriz pasatzeko
+        
+
+        if(reboundAmount > 4) { // Erreboteak limitatezea, abiadura eta grabitatea 0-ra jartzeko, mugitu eta ataskatu ez dadin
+            gravity = 0;
+            velocityX = 0;
+            velocityY = 0;
+            canShootAgain = true;   // gelditzen denean berriro jaurti ahal da
+        }
+
+        // Canvas-a garbitu
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Pilota marraztu
+        dibujarBola();
+
+        // Norabide marra
+        if(mouseDown) {
+            dibujarFlechaDeApuntar();
+        }
+
+        dibujarEntorno();
+
+        // requestAnimationFrame -> ezin izan dugu aldatu
+        setTimeout(function() {
+            requestAnimationFrame(update);
+        }, 1000 / 60);
+    }
+
+    function dibujarBola() {
+        ctx.beginPath();
+        ctx.arc(x + ballRadius, y + ballRadius, ballRadius, 0, Math.PI * 2);
+        ctx.fillStyle = 'white';
+        ctx.fill();
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.closePath();
+    }
+
+    function dibujarFlechaDeApuntar() {
+        // Marratxoa marraztu angelua kontuan izanda
+        var arrowLength = 80;
+        ctx.save();
+        ctx.translate(x + ballRadius, y + ballRadius);
+        ctx.rotate(arrowAngle);
+
+        // Marratxoaren gorputza
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(arrowLength, 0);
+        ctx.lineWidth = 3.5;
+        ctx.strokeStyle = "black";
+        ctx.stroke();
+
+        // Marratxoaren punta (gezia)
+        ctx.beginPath();
+        ctx.moveTo(arrowLength - 15, -10);
+        ctx.lineTo(arrowLength, 0);
+        ctx.lineTo(arrowLength - 15, 10);
+        ctx.fillStyle = "black";
+        ctx.fill();
+
+        ctx.restore();
+    }
+
+    function dibujarEntorno() { //erliebea marraztea
+        let i;
+
+        for(i = 0; i < entorno.length; i++) {
+            var obstaculo = entorno[i];
+            
+            if(obstaculo.tipo === "Cuadrado") {
+                ctx.fillStyle = 'rgba(255, 0, 0, 0)';
+                ctx.fillRect(obstaculo.x0, obstaculo.y0, obstaculo.dimX, obstaculo.dimY);
+            } else if(obstaculo.tipo === "Rampa") {
+                ctx.beginPath();
+                ctx.fillStyle = 'rgba(255, 0, 0, 0)';
+                ctx.moveTo(obstaculo.ceroX, obstaculo.ceroY);
+                ctx.lineTo(obstaculo.finX, obstaculo.finY);
+                ctx.lineTo(obstaculo.finX, obstaculo.ceroY);
+                ctx.lineTo(obstaculo.ceroX, obstaculo.ceroY);
+                ctx.closePath();
+                ctx.fill();
+            } else if(obstaculo.tipo === "RampaDerecha") {
+                ctx.beginPath();
+                ctx.fillStyle = 'rgba(255, 0, 0, 0)';
+                ctx.moveTo(obstaculo.ceroX, obstaculo.ceroY);
+                ctx.lineTo(obstaculo.finX, obstaculo.finY);
+                ctx.lineTo(obstaculo.ceroX, obstaculo.finY);
+                ctx.lineTo(obstaculo.ceroX, obstaculo.ceroY);
+                ctx.closePath();
+                ctx.fill();
+            }
+        }
+
+        ctx.fillStyle = 'rgba(255, 0, 0, 0)';
+        ctx.fillRect(1354,378,61,31);
+        
+        ctx.beginPath();
+        ctx.fillStyle = 'rgba(255, 0, 0, 0)';
+        ctx.arc(1354 + 30, 378, 30, 0, Math.PI, false);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.fillStyle = 'rgba(255, 0, 0, 0)';
+        ctx.moveTo(polygonCoords[0], polygonCoords[1]);
+
+        for (let i = 2; i < polygonCoords.length; i += 2) {
+            ctx.lineTo(polygonCoords[i], polygonCoords[i + 1]);
+        }
+
+        ctx.closePath();
+        ctx.fill();
+    }
+
+    crearObstaculos();
+    update();
+};
+
+    </script>
+    
+</body>
+
+</html>
